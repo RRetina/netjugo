@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"netjugo" // replace with "github.com/rretina/netjugo"
+	"github.com/rretina/netjugo"
 )
 
 func main() {

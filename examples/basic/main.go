@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"netjugo" // replace with "github.com/rretina/netjugo"
+	"github.com/rretina/netjugo"
 )
 
 func main() {
