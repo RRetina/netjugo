@@ -1,4 +1,4 @@
-module netjugo
+module github.com/rretina/netjugo
 
 go 1.24
 
