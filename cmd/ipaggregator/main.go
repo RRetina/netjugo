@@ -29,22 +29,22 @@ func main() {
 	)
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "IP Prefix Aggregation Tool\n")
-		fmt.Fprintf(os.Stderr, "Aggregates IPv4 and IPv6 CIDR prefixes with support for minimum lengths,\n")
-		fmt.Fprintf(os.Stderr, "inclusion/exclusion constraints, and optimal aggregation quality.\n\n")
-		fmt.Fprintf(os.Stderr, "Options:\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\n", os.Args[0])
+		_, _ = fmt.Fprintf(os.Stderr, "IP Prefix Aggregation Tool\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Aggregates IPv4 and IPv6 CIDR prefixes with support for minimum lengths,\n")
+		_, _ = fmt.Fprintf(os.Stderr, "inclusion/exclusion constraints, and optimal aggregation quality.\n\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s -input prefixes.txt -output aggregated.txt -stats\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -input large.txt -min-ipv4 24 -min-ipv6 48 -verbose\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -input base.txt -include include.txt -exclude exclude.txt\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -input prefixes.txt -exclude-prefix '192.168.1.0/24,10.0.0.0/24'\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\nInput Format:\n")
-		fmt.Fprintf(os.Stderr, "  One IP prefix per line in CIDR notation (e.g., 192.168.1.0/24, 2001:db8::/32)\n")
-		fmt.Fprintf(os.Stderr, "  Comments (lines starting with #) and empty lines are ignored\n")
-		fmt.Fprintf(os.Stderr, "  IPv4 addresses without /xx will be treated as /32\n")
-		fmt.Fprintf(os.Stderr, "  IPv6 addresses without /xx will be treated as /128\n")
+		_, _ = fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		_, _ = fmt.Fprintf(os.Stderr, "  %s -input prefixes.txt -output aggregated.txt -stats\n", os.Args[0])
+		_, _ = fmt.Fprintf(os.Stderr, "  %s -input large.txt -min-ipv4 24 -min-ipv6 48 -verbose\n", os.Args[0])
+		_, _ = fmt.Fprintf(os.Stderr, "  %s -input base.txt -include include.txt -exclude exclude.txt\n", os.Args[0])
+		_, _ = fmt.Fprintf(os.Stderr, "  %s -input prefixes.txt -exclude-prefix '192.168.1.0/24,10.0.0.0/24'\n", os.Args[0])
+		_, _ = fmt.Fprintf(os.Stderr, "\nInput Format:\n")
+		_, _ = fmt.Fprintf(os.Stderr, "  One IP prefix per line in CIDR notation (e.g., 192.168.1.0/24, 2001:db8::/32)\n")
+		_, _ = fmt.Fprintf(os.Stderr, "  Comments (lines starting with #) and empty lines are ignored\n")
+		_, _ = fmt.Fprintf(os.Stderr, "  IPv4 addresses without /xx will be treated as /32\n")
+		_, _ = fmt.Fprintf(os.Stderr, "  IPv6 addresses without /xx will be treated as /128\n")
 	}
 
 	flag.Parse()
@@ -57,7 +57,7 @@ func main() {
 	}
 
 	if *inputFile == "" {
-		fmt.Fprintf(os.Stderr, "Error: input file is required\n\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Error: input file is required\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -185,25 +185,25 @@ func main() {
 
 	// Show statistics
 	if *showStats || *verbose {
-		fmt.Fprintf(os.Stderr, "\nAggregation Statistics:\n")
-		fmt.Fprintf(os.Stderr, "  Original prefixes: %d\n", finalStats.OriginalCount)
-		fmt.Fprintf(os.Stderr, "  Aggregated prefixes: %d\n", finalStats.TotalPrefixes)
-		fmt.Fprintf(os.Stderr, "  IPv4 prefixes: %d\n", finalStats.IPv4PrefixCount)
-		fmt.Fprintf(os.Stderr, "  IPv6 prefixes: %d\n", finalStats.IPv6PrefixCount)
-		fmt.Fprintf(os.Stderr, "  Reduction ratio: %.2f%%\n", finalStats.ReductionRatio*100)
-		fmt.Fprintf(os.Stderr, "  Processing time: %d ms\n", finalStats.ProcessingTimeMs)
-		fmt.Fprintf(os.Stderr, "  Memory usage: %s\n", formatBytes(finalStats.MemoryUsageBytes))
+		_, _ = fmt.Fprintf(os.Stderr, "\nAggregation Statistics:\n")
+		_, _ = fmt.Fprintf(os.Stderr, "  Original prefixes: %d\n", finalStats.OriginalCount)
+		_, _ = fmt.Fprintf(os.Stderr, "  Aggregated prefixes: %d\n", finalStats.TotalPrefixes)
+		_, _ = fmt.Fprintf(os.Stderr, "  IPv4 prefixes: %d\n", finalStats.IPv4PrefixCount)
+		_, _ = fmt.Fprintf(os.Stderr, "  IPv6 prefixes: %d\n", finalStats.IPv6PrefixCount)
+		_, _ = fmt.Fprintf(os.Stderr, "  Reduction ratio: %.2f%%\n", finalStats.ReductionRatio*100)
+		_, _ = fmt.Fprintf(os.Stderr, "  Processing time: %d ms\n", finalStats.ProcessingTimeMs)
+		_, _ = fmt.Fprintf(os.Stderr, "  Memory usage: %s\n", formatBytes(finalStats.MemoryUsageBytes))
 	}
 
 	// Show memory statistics
 	if *showMemory {
 		memStats := aggregator.GetMemoryStats()
-		fmt.Fprintf(os.Stderr, "\nMemory Statistics:\n")
-		fmt.Fprintf(os.Stderr, "  Aggregator memory: %s\n", formatBytes(memStats.AggregatorBytes))
-		fmt.Fprintf(os.Stderr, "  System allocation: %s\n", formatBytes(memStats.AllocBytes))
-		fmt.Fprintf(os.Stderr, "  Total allocated: %s\n", formatBytes(memStats.TotalAllocBytes))
-		fmt.Fprintf(os.Stderr, "  System memory: %s\n", formatBytes(memStats.SysBytes))
-		fmt.Fprintf(os.Stderr, "  GC runs: %d\n", memStats.NumGC)
+		_, _ = fmt.Fprintf(os.Stderr, "\nMemory Statistics:\n")
+		_, _ = fmt.Fprintf(os.Stderr, "  Aggregator memory: %s\n", formatBytes(memStats.AggregatorBytes))
+		_, _ = fmt.Fprintf(os.Stderr, "  System allocation: %s\n", formatBytes(memStats.AllocBytes))
+		_, _ = fmt.Fprintf(os.Stderr, "  Total allocated: %s\n", formatBytes(memStats.TotalAllocBytes))
+		_, _ = fmt.Fprintf(os.Stderr, "  System memory: %s\n", formatBytes(memStats.SysBytes))
+		_, _ = fmt.Fprintf(os.Stderr, "  GC runs: %d\n", memStats.NumGC)
 	}
 }
 
