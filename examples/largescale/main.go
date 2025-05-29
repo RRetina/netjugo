@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/rretina/netjugo"
+	"netjugo" // replace with "github.com/rretina/netjugo"
 )
 
 func main() {
