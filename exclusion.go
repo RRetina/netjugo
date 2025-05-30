@@ -79,12 +79,48 @@ func (pa *PrefixAggregator) processExclusionsIPv6() error {
 }
 
 func (pa *PrefixAggregator) findOverlappingPrefixes(target *IPPrefix, prefixList []*IPPrefix) []*IPPrefix {
-	var overlapping []*IPPrefix
+	if len(prefixList) == 0 {
+		return nil
+	}
 
-	for _, prefix := range prefixList {
+	// Binary search to find the first prefix that might overlap
+	// We look for the rightmost prefix whose Min <= target.Max
+	left := 0
+	right := len(prefixList) - 1
+	firstPossible := -1
+
+	for left <= right {
+		mid := left + (right-left)/2
+		if prefixList[mid].Min.Cmp(target.Max) <= 0 {
+			firstPossible = mid
+			left = mid + 1
+		} else {
+			right = mid - 1
+		}
+	}
+
+	if firstPossible == -1 {
+		// No prefix has Min <= target.Max, so no overlaps possible
+		return nil
+	}
+
+	// Now scan backwards from firstPossible to find all overlapping prefixes
+	var overlapping []*IPPrefix
+	for i := firstPossible; i >= 0; i-- {
+		prefix := prefixList[i]
+		// Stop when we find a prefix whose Max < target.Min (no more overlaps possible)
+		if prefix.Max.Cmp(target.Min) < 0 {
+			break
+		}
 		if overlaps(target, prefix) {
 			overlapping = append(overlapping, prefix)
 		}
+	}
+
+	// Reverse the slice to maintain original order
+	for i := 0; i < len(overlapping)/2; i++ {
+		j := len(overlapping) - 1 - i
+		overlapping[i], overlapping[j] = overlapping[j], overlapping[i]
 	}
 
 	return overlapping
@@ -180,21 +216,23 @@ func (pa *PrefixAggregator) trimOverlap(original, exclude *IPPrefix, isIPv4 bool
 }
 
 func (pa *PrefixAggregator) rangeToPrefixes(min, max *uint256.Int, isIPv4 bool) ([]*IPPrefix, error) {
-	// Try to create a single prefix first
-	prefix, err := uint256RangeToPrefix(min, max, isIPv4)
-	if err == nil {
-		prefixMin, prefixMax, err := prefixToUint256Range(prefix)
-		if err != nil {
-			return nil, err
-		}
-		return []*IPPrefix{{
-			Prefix: prefix,
-			Min:    prefixMin,
-			Max:    prefixMax,
-		}}, nil
+	// Wrapper function that adds recursion depth tracking
+	return pa.rangeToPrefixesWithDepth(min, max, isIPv4, 0)
+}
+
+func (pa *PrefixAggregator) rangeToPrefixesWithDepth(min, max *uint256.Int, isIPv4 bool, depth int) ([]*IPPrefix, error) {
+	// Prevent infinite recursion
+	const maxDepth = 256 // Reasonable limit for IPv6 (128 bits * 2)
+	if depth > maxDepth {
+		return nil, fmt.Errorf("maximum recursion depth %d exceeded for range [%s, %s]", maxDepth, min.Hex(), max.Hex())
 	}
 
-	// If single prefix doesn't work, split recursively
+	// Handle edge case: min > max
+	if min.Cmp(max) > 0 {
+		return nil, fmt.Errorf("invalid range: min > max")
+	}
+
+	// Handle single address case first
 	if min.Cmp(max) == 0 {
 		// Single address
 		prefix, err := uint256RangeToPrefix(min, max, isIPv4)
@@ -207,11 +245,27 @@ func (pa *PrefixAggregator) rangeToPrefixes(min, max *uint256.Int, isIPv4 bool) 
 			return nil, err
 		}
 
-		return []*IPPrefix{{
-			Prefix: prefix,
-			Min:    prefixMin,
-			Max:    prefixMax,
-		}}, nil
+		result := acquireIPPrefix()
+		result.Prefix = prefix
+		result.Min.Set(prefixMin)
+		result.Max.Set(prefixMax)
+
+		return []*IPPrefix{result}, nil
+	}
+
+	// Try to create a single prefix
+	prefix, err := uint256RangeToPrefix(min, max, isIPv4)
+	if err == nil {
+		prefixMin, prefixMax, err := prefixToUint256Range(prefix)
+		if err != nil {
+			return nil, err
+		}
+		result := acquireIPPrefix()
+		result.Prefix = prefix
+		result.Min.Set(prefixMin)
+		result.Max.Set(prefixMax)
+
+		return []*IPPrefix{result}, nil
 	}
 
 	// Split range in half and recursively process each half
@@ -221,8 +275,16 @@ func (pa *PrefixAggregator) rangeToPrefixes(min, max *uint256.Int, isIPv4 bool) 
 	var result []*IPPrefix
 
 	// Left half
-	if min.Cmp(mid) <= 0 {
-		leftPrefixes, err := pa.rangeToPrefixes(min, mid, isIPv4)
+	if min.Cmp(mid) < 0 {
+		leftPrefixes, err := pa.rangeToPrefixesWithDepth(min, mid, isIPv4, depth+1)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, leftPrefixes...)
+	} else if min.Cmp(mid) == 0 && min.Cmp(max) < 0 {
+		// Special case: min == mid, which means we have adjacent values
+		// Process just the single min value
+		leftPrefixes, err := pa.rangeToPrefixesWithDepth(min, min, isIPv4, depth+1)
 		if err != nil {
 			return nil, err
 		}
@@ -231,8 +293,15 @@ func (pa *PrefixAggregator) rangeToPrefixes(min, max *uint256.Int, isIPv4 bool) 
 
 	// Right half
 	midPlusOne := new(uint256.Int).Add(mid, uint256.NewInt(1))
-	if midPlusOne.Cmp(max) <= 0 {
-		rightPrefixes, err := pa.rangeToPrefixes(midPlusOne, max, isIPv4)
+	if midPlusOne.Cmp(max) < 0 {
+		rightPrefixes, err := pa.rangeToPrefixesWithDepth(midPlusOne, max, isIPv4, depth+1)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, rightPrefixes...)
+	} else if midPlusOne.Cmp(max) == 0 {
+		// Process just the single max value
+		rightPrefixes, err := pa.rangeToPrefixesWithDepth(max, max, isIPv4, depth+1)
 		if err != nil {
 			return nil, err
 		}

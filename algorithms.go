@@ -223,11 +223,12 @@ func mergeAdjacent(a, b *IPPrefix) (*IPPrefix, error) {
 			return nil, err
 		}
 
-		return &IPPrefix{
-			Prefix: prefix,
-			Min:    min,
-			Max:    max,
-		}, nil
+		result := acquireIPPrefix()
+		result.Prefix = prefix
+		result.Min.Set(min)
+		result.Max.Set(max)
+
+		return result, nil
 	}
 
 	return nil, fmt.Errorf("cannot merge ranges into valid CIDR prefix")
@@ -254,11 +255,12 @@ func mergeOverlapping(a, b *IPPrefix) (*IPPrefix, error) {
 			return nil, err
 		}
 
-		return &IPPrefix{
-			Prefix: prefix,
-			Min:    min,
-			Max:    max,
-		}, nil
+		result := acquireIPPrefix()
+		result.Prefix = prefix
+		result.Min.Set(min)
+		result.Max.Set(max)
+
+		return result, nil
 	}
 
 	return nil, fmt.Errorf("cannot merge ranges into valid CIDR prefix")
@@ -289,13 +291,15 @@ func (pa *PrefixAggregator) enforceMinPrefixLengthIPv4() error {
 	newPrefixes := make([]*IPPrefix, 0, len(pa.IPv4Prefixes))
 
 	for _, prefix := range pa.IPv4Prefixes {
-		if prefix.Prefix.Bits() < pa.MinPrefixLenIPv4 {
-			split, err := splitPrefixToMinLength(prefix, pa.MinPrefixLenIPv4, true)
+		if prefix.Prefix.Bits() > pa.MinPrefixLenIPv4 {
+			// Round up to minimum prefix length (make it less specific)
+			rounded, err := roundUpToMinLength(prefix, pa.MinPrefixLenIPv4)
 			if err != nil {
-				return fmt.Errorf("failed to split IPv4 prefix %s: %w", prefix.Prefix.String(), err)
+				return fmt.Errorf("failed to round up IPv4 prefix %s: %w", prefix.Prefix.String(), err)
 			}
-			newPrefixes = append(newPrefixes, split...)
+			newPrefixes = append(newPrefixes, rounded)
 		} else {
+			// Prefix is already at or less specific than minimum
 			newPrefixes = append(newPrefixes, prefix)
 		}
 	}
@@ -312,13 +316,15 @@ func (pa *PrefixAggregator) enforceMinPrefixLengthIPv6() error {
 	newPrefixes := make([]*IPPrefix, 0, len(pa.IPv6Prefixes))
 
 	for _, prefix := range pa.IPv6Prefixes {
-		if prefix.Prefix.Bits() < pa.MinPrefixLenIPv6 {
-			split, err := splitPrefixToMinLength(prefix, pa.MinPrefixLenIPv6, false)
+		if prefix.Prefix.Bits() > pa.MinPrefixLenIPv6 {
+			// Round up to minimum prefix length (make it less specific)
+			rounded, err := roundUpToMinLength(prefix, pa.MinPrefixLenIPv6)
 			if err != nil {
-				return fmt.Errorf("failed to split IPv6 prefix %s: %w", prefix.Prefix.String(), err)
+				return fmt.Errorf("failed to round up IPv6 prefix %s: %w", prefix.Prefix.String(), err)
 			}
-			newPrefixes = append(newPrefixes, split...)
+			newPrefixes = append(newPrefixes, rounded)
 		} else {
+			// Prefix is already at or less specific than minimum
 			newPrefixes = append(newPrefixes, prefix)
 		}
 	}
@@ -327,100 +333,33 @@ func (pa *PrefixAggregator) enforceMinPrefixLengthIPv6() error {
 	return nil
 }
 
-func splitPrefixToMinLength(prefix *IPPrefix, minLength int, isIPv4 bool) ([]*IPPrefix, error) {
+func roundUpToMinLength(prefix *IPPrefix, minLength int) (*IPPrefix, error) {
 	currentLength := prefix.Prefix.Bits()
 
-	if currentLength >= minLength {
-		return []*IPPrefix{prefix}, nil
+	// If prefix is already at or less specific than minimum, return as is
+	if currentLength <= minLength {
+		return prefix, nil
 	}
 
-	maxBits := 32
-	if !isIPv4 {
-		maxBits = 128
+	// Need to make the prefix less specific (round up to minLength)
+	addr := prefix.Prefix.Addr()
+
+	// Create a new prefix with the minimum length
+	newPrefix, err := addr.Prefix(minLength)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create prefix with length %d: %w", minLength, err)
 	}
 
-	if minLength > maxBits {
-		return nil, fmt.Errorf("%w: minimum length %d exceeds maximum for IP version", ErrInvalidMinPrefixLen, minLength)
+	// Calculate the new min and max for the rounded prefix
+	newMin, newMax, err := prefixToUint256Range(newPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate range for rounded prefix: %w", err)
 	}
 
-	return binarySplitPrefix(prefix, minLength, isIPv4)
-}
-
-func binarySplitPrefix(prefix *IPPrefix, targetLength int, isIPv4 bool) ([]*IPPrefix, error) {
-	if prefix.Prefix.Bits() >= targetLength {
-		return []*IPPrefix{prefix}, nil
-	}
-
-	result := []*IPPrefix{prefix}
-
-	for len(result) > 0 && result[0].Prefix.Bits() < targetLength {
-		var newResult []*IPPrefix
-
-		for _, p := range result {
-			if p.Prefix.Bits() >= targetLength {
-				newResult = append(newResult, p)
-			} else {
-				split, err := splitPrefixInHalf(p, isIPv4)
-				if err != nil {
-					return nil, err
-				}
-				newResult = append(newResult, split...)
-			}
-		}
-
-		result = newResult
-	}
+	result := acquireIPPrefix()
+	result.Prefix = newPrefix
+	result.Min.Set(newMin)
+	result.Max.Set(newMax)
 
 	return result, nil
-}
-
-func splitPrefixInHalf(prefix *IPPrefix, isIPv4 bool) ([]*IPPrefix, error) {
-	currentBits := prefix.Prefix.Bits()
-	maxBits := 32
-	if !isIPv4 {
-		maxBits = 128
-	}
-
-	if currentBits >= maxBits {
-		return []*IPPrefix{prefix}, nil
-	}
-
-	mid := new(uint256.Int).Add(prefix.Min, prefix.Max)
-	mid.Add(mid, uint256.NewInt(1))
-	mid.Rsh(mid, 1)
-
-	maxFirst := new(uint256.Int).Sub(mid, uint256.NewInt(1))
-
-	firstPrefix, err := uint256RangeToPrefix(prefix.Min, maxFirst, isIPv4)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create first half prefix: %w", err)
-	}
-
-	secondPrefix, err := uint256RangeToPrefix(mid, prefix.Max, isIPv4)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create second half prefix: %w", err)
-	}
-
-	firstMin, firstMax, err := prefixToUint256Range(firstPrefix)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert first prefix to range: %w", err)
-	}
-
-	secondMin, secondMax, err := prefixToUint256Range(secondPrefix)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert second prefix to range: %w", err)
-	}
-
-	return []*IPPrefix{
-		{
-			Prefix: firstPrefix,
-			Min:    firstMin,
-			Max:    firstMax,
-		},
-		{
-			Prefix: secondPrefix,
-			Min:    secondMin,
-			Max:    secondMax,
-		},
-	}, nil
 }

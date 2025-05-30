@@ -14,9 +14,24 @@ func parseIPPrefix(prefixStr string) (*IPPrefix, error) {
 		return nil, fmt.Errorf("%w: empty prefix string", ErrInvalidPrefix)
 	}
 
+	// First try to parse as a prefix
 	prefix, err := netip.ParsePrefix(prefixStr)
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to parse %q: %v", ErrInvalidPrefix, prefixStr, err)
+		// If that fails, try to parse as a bare IP address
+		addr, addrErr := netip.ParseAddr(prefixStr)
+		if addrErr != nil {
+			// Neither worked, return the original prefix parsing error
+			return nil, fmt.Errorf("%w: failed to parse %q: %v", ErrInvalidPrefix, prefixStr, err)
+		}
+
+		// Successfully parsed as IP address, convert to host prefix
+		if addr.Is4() {
+			prefix = netip.PrefixFrom(addr, 32)
+		} else if addr.Is6() {
+			prefix = netip.PrefixFrom(addr, 128)
+		} else {
+			return nil, fmt.Errorf("%w: unsupported address type for %q", ErrInvalidPrefix, prefixStr)
+		}
 	}
 
 	if !prefix.IsValid() {
@@ -28,11 +43,12 @@ func parseIPPrefix(prefixStr string) (*IPPrefix, error) {
 		return nil, fmt.Errorf("failed to convert prefix to uint256 range: %w", err)
 	}
 
-	return &IPPrefix{
-		Prefix: prefix,
-		Min:    min,
-		Max:    max,
-	}, nil
+	ipPrefix := acquireIPPrefix()
+	ipPrefix.Prefix = prefix
+	ipPrefix.Min.Set(min)
+	ipPrefix.Max.Set(max)
+
+	return ipPrefix, nil
 }
 
 func prefixToUint256Range(prefix netip.Prefix) (*uint256.Int, *uint256.Int, error) {

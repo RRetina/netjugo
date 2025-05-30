@@ -13,10 +13,13 @@ func TestMinPrefixLengthEnforcement(t *testing.T) {
 	}
 
 	testPrefixes := []string{
-		"192.168.0.0/22",  // Should be split to /24s (more reasonable size)
+		"192.168.0.0/22",  // Already less specific than /24, should remain unchanged
+		"192.168.1.0/28",  // More specific than /24, should be rounded up to /24
 		"10.0.0.0/24",     // Already meets requirement
-		"2001:db8::/62",   // Should be split to /64s (more reasonable size)
+		"10.0.0.128/25",   // More specific than /24, should be rounded up to /24
+		"2001:db8::/62",   // Already less specific than /64, should remain unchanged
 		"2001:db8:1::/64", // Already meets requirement
+		"2001:db8:2::/80", // More specific than /64, should be rounded up to /64
 	}
 
 	err = pa.AddPrefixes(testPrefixes)
@@ -42,24 +45,41 @@ func TestMinPrefixLengthEnforcement(t *testing.T) {
 		t.Logf("  %s", prefix)
 	}
 
-	// The /16 should have been split into multiple /24s
-	if len(ipv4Result) < 2 {
-		t.Errorf("Expected multiple IPv4 prefixes after splitting /16 to /24s, got %d", len(ipv4Result))
+	// Check expected results
+	expectedIPv4 := map[string]bool{
+		"192.168.0.0/22": true, // Unchanged (less specific than /24)
+		"192.168.1.0/24": true, // Rounded up from /28
+		"10.0.0.0/24":    true, // Unchanged (already /24) - should merge with rounded /25
 	}
 
-	// The /32 should have been split into multiple /64s
-	if len(ipv6Result) < 2 {
-		t.Errorf("Expected multiple IPv6 prefixes after splitting /32 to /64s, got %d", len(ipv6Result))
+	expectedIPv6 := map[string]bool{
+		"2001:db8::/62":   true, // Unchanged (less specific than /64)
+		"2001:db8:1::/64": true, // Unchanged (already /64)
+		"2001:db8:2::/64": true, // Rounded up from /80
 	}
 
-	// Verify all resulting prefixes meet minimum length requirements
+	// Verify IPv4 results
+	if len(ipv4Result) > len(expectedIPv4) {
+		t.Errorf("Expected at most %d IPv4 prefixes after aggregation, got %d", len(expectedIPv4), len(ipv4Result))
+	}
+
+	// Verify IPv6 results
+	if len(ipv6Result) != len(expectedIPv6) {
+		t.Errorf("Expected %d IPv6 prefixes, got %d", len(expectedIPv6), len(ipv6Result))
+	}
+
+	// Verify all resulting prefixes are correctly handled
+	// With the new implementation:
+	// - Prefixes more specific than minimum are rounded up
+	// - Prefixes less specific than minimum remain unchanged
 	for _, prefix := range ipv4Result {
 		parsed, err := parseIPPrefix(prefix)
 		if err != nil {
 			t.Errorf("Failed to parse result prefix %s: %v", prefix, err)
 		}
-		if parsed.Prefix.Bits() < 24 {
-			t.Errorf("IPv4 prefix %s has length %d, expected >= 24", prefix, parsed.Prefix.Bits())
+		// No prefix should be more specific than the minimum
+		if parsed.Prefix.Bits() > 24 {
+			t.Errorf("IPv4 prefix %s has length %d, expected <= 24", prefix, parsed.Prefix.Bits())
 		}
 	}
 
@@ -68,47 +88,62 @@ func TestMinPrefixLengthEnforcement(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed to parse result prefix %s: %v", prefix, err)
 		}
-		if parsed.Prefix.Bits() < 64 {
-			t.Errorf("IPv6 prefix %s has length %d, expected >= 64", prefix, parsed.Prefix.Bits())
+		// No prefix should be more specific than the minimum
+		if parsed.Prefix.Bits() > 64 {
+			t.Errorf("IPv6 prefix %s has length %d, expected <= 64", prefix, parsed.Prefix.Bits())
 		}
 	}
 }
 
-func TestMinPrefixLengthSplitting(t *testing.T) {
+func TestMinPrefixLengthRounding(t *testing.T) {
 	tests := []struct {
-		name          string
-		input         string
-		minLength     int
-		isIPv4        bool
-		expectedCount int
+		name           string
+		input          string
+		minLength      int
+		isIPv4         bool
+		expectedPrefix string
 	}{
 		{
-			name:          "Split /22 to /24",
-			input:         "192.168.0.0/22",
-			minLength:     24,
-			isIPv4:        true,
-			expectedCount: 4, // 2^(24-22) = 4
+			name:           "No rounding needed - already less specific",
+			input:          "192.168.0.0/22",
+			minLength:      24,
+			isIPv4:         true,
+			expectedPrefix: "192.168.0.0/22",
 		},
 		{
-			name:          "Split /22 to /24",
-			input:         "10.0.0.0/22",
-			minLength:     24,
-			isIPv4:        true,
-			expectedCount: 4, // 2^(24-22) = 4
+			name:           "Round /28 up to /24",
+			input:          "192.168.1.16/28",
+			minLength:      24,
+			isIPv4:         true,
+			expectedPrefix: "192.168.1.0/24",
 		},
 		{
-			name:          "No split needed",
-			input:         "192.168.1.0/24",
-			minLength:     24,
-			isIPv4:        true,
-			expectedCount: 1,
+			name:           "No rounding needed - exactly minimum",
+			input:          "192.168.1.0/24",
+			minLength:      24,
+			isIPv4:         true,
+			expectedPrefix: "192.168.1.0/24",
 		},
 		{
-			name:          "Split /62 to /64",
-			input:         "2001:db8::/62",
-			minLength:     64,
-			isIPv4:        false,
-			expectedCount: 4, // 2^(64-62) = 4
+			name:           "Round /25 up to /24",
+			input:          "10.0.0.128/25",
+			minLength:      24,
+			isIPv4:         true,
+			expectedPrefix: "10.0.0.0/24",
+		},
+		{
+			name:           "No rounding needed - IPv6 less specific",
+			input:          "2001:db8::/62",
+			minLength:      64,
+			isIPv4:         false,
+			expectedPrefix: "2001:db8::/62",
+		},
+		{
+			name:           "Round /80 up to /64",
+			input:          "2001:db8:1:2::/80",
+			minLength:      64,
+			isIPv4:         false,
+			expectedPrefix: "2001:db8:1:2::/64",
 		},
 	}
 
@@ -119,21 +154,19 @@ func TestMinPrefixLengthSplitting(t *testing.T) {
 				t.Fatalf("Failed to parse input prefix: %v", err)
 			}
 
-			result, err := splitPrefixToMinLength(prefix, tt.minLength, tt.isIPv4)
+			result, err := roundUpToMinLength(prefix, tt.minLength)
 			if err != nil {
-				t.Fatalf("Failed to split prefix: %v", err)
+				t.Fatalf("Failed to round prefix: %v", err)
 			}
 
-			if len(result) != tt.expectedCount {
-				t.Errorf("Expected %d prefixes, got %d", tt.expectedCount, len(result))
+			if result.Prefix.String() != tt.expectedPrefix {
+				t.Errorf("Expected prefix %s, got %s", tt.expectedPrefix, result.Prefix.String())
 			}
 
-			// Verify all results meet minimum length
-			for i, resultPrefix := range result {
-				if resultPrefix.Prefix.Bits() < tt.minLength {
-					t.Errorf("Result prefix %d (%s) has length %d, expected >= %d",
-						i, resultPrefix.Prefix.String(), resultPrefix.Prefix.Bits(), tt.minLength)
-				}
+			// Verify the result meets minimum length requirement
+			if result.Prefix.Bits() > tt.minLength {
+				t.Errorf("Result prefix %s has length %d, expected <= %d",
+					result.Prefix.String(), result.Prefix.Bits(), tt.minLength)
 			}
 		})
 	}

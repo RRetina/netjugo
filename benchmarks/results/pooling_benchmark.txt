@@ -1,0 +1,8 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/rretina/netjugo
+cpu: Apple M1 Pro
+BenchmarkIPPrefixAllocation/WithPooling-10         	34919672	        33.02 ns/op	       0 B/op	       0 allocs/op
+BenchmarkIPPrefixAllocation/WithoutPooling-10      	46961446	        25.17 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/rretina/netjugo	2.728s

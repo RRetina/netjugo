@@ -1,0 +1,56 @@
+# Test file with various invalid inputs for testing error handling
+
+# Valid prefixes mixed with invalid ones
+192.168.1.0/24
+10.0.0.0/8
+
+# Invalid: missing CIDR notation (but should be auto-fixed)
+192.168.2.5
+2001:db8::1
+
+# Invalid: wrong CIDR values
+192.168.3.0/33
+192.168.4.0/-1
+2001:db8::/129
+2001:db8::/999
+
+# Invalid: malformed IP addresses
+192.168.256.1/24
+192.168.1/24
+192.168.1.1.1/24
+999.999.999.999/32
+
+# Invalid: not IP addresses at all
+not-an-ip/24
+random-text
+!!!###$$$
+/24
+192.168.5.0/
+
+# Empty lines and whitespace
+
+
+   192.168.6.0/24   
+		10.1.0.0/16		
+
+# Mixed valid and invalid on same concepts
+192.168.7.0/24
+192.168.7.0/28
+192.168.8.0/abc
+192.168.9.0/2.5
+
+# IPv6 invalid formats
+2001:db8::gggg/64
+2001:db8:0:0:0:0:0:0:1/128
+::::/128
+2001:db8/64
+
+# Comments that should be ignored
+# This is a comment
+# 192.168.10.0/24 this should be ignored
+network  # header word that should be ignored
+prefix   # header word that should be ignored
+cidr     # header word that should be ignored
+
+# Valid ones at the end
+172.16.0.0/12

@@ -1,0 +1,66 @@
+# Complex exclusion test dataset
+# This file contains prefixes designed to test complex exclusion scenarios
+
+# Base supernets that will be aggregated
+10.0.0.0/8
+172.16.0.0/12
+192.168.0.0/16
+
+# More specific prefixes that overlap
+10.10.0.0/16
+10.20.0.0/16
+10.30.0.0/16
+172.16.0.0/16
+172.17.0.0/16
+192.168.1.0/24
+192.168.2.0/24
+192.168.3.0/24
+
+# IPv6 prefixes
+2001:db8::/32
+2001:db8:1::/48
+2001:db8:2::/48
+2001:db8:1:1::/64
+2001:db8:1:2::/64
+
+# Exclusions to test (when used with SetExcludePrefixes):
+# - Exclude 10.15.0.0/16 from 10.0.0.0/8
+# - Exclude 172.16.128.0/17 from 172.16.0.0/16
+# - Exclude 192.168.1.128/25 from 192.168.1.0/24
+# - Exclude 2001:db8:1:1::/64 from 2001:db8:1::/48
+
+# Adjacent prefixes for testing
+192.168.4.0/24
+192.168.5.0/24
+192.168.6.0/24
+192.168.7.0/24
+
+# Overlapping prefixes
+10.50.0.0/16
+10.50.128.0/17
+10.51.0.0/16
+
+# Single addresses to test edge cases
+192.168.100.1/32
+192.168.100.2/32
+192.168.100.3/32
+192.168.100.4/32
+
+# IPv6 single addresses
+2001:db8:3::1/128
+2001:db8:3::2/128
+2001:db8:3::3/128
+2001:db8:3::4/128
+
+# Test minimum prefix length scenarios
+192.168.200.0/28
+192.168.200.16/28
+192.168.200.32/28
+192.168.200.48/28
+
+# More complex overlapping scenarios
+172.20.0.0/14
+172.20.0.0/16
+172.21.0.0/16
+172.22.0.0/16
+172.23.0.0/16

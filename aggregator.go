@@ -15,6 +15,30 @@ import (
 	"github.com/holiman/uint256"
 )
 
+// Memory pool for IPPrefix allocations to reduce GC pressure
+var ipPrefixPool = sync.Pool{
+	New: func() interface{} {
+		return &IPPrefix{
+			Min: new(uint256.Int),
+			Max: new(uint256.Int),
+		}
+	},
+}
+
+// acquireIPPrefix gets an IPPrefix from the pool
+func acquireIPPrefix() *IPPrefix {
+	return ipPrefixPool.Get().(*IPPrefix)
+}
+
+// releaseIPPrefix returns an IPPrefix to the pool
+func releaseIPPrefix(p *IPPrefix) {
+	// Clear the prefix before returning to pool
+	p.Prefix = netip.Prefix{}
+	p.Min.Clear()
+	p.Max.Clear()
+	ipPrefixPool.Put(p)
+}
+
 type IPPrefix struct {
 	Prefix netip.Prefix
 	Min    *uint256.Int
@@ -212,6 +236,26 @@ func (pa *PrefixAggregator) AddFromReader(reader io.Reader) error {
 func (pa *PrefixAggregator) Reset() error {
 	pa.mu.Lock()
 	defer pa.mu.Unlock()
+
+	// Release all prefixes back to the pool
+	for _, p := range pa.IPv4Prefixes {
+		releaseIPPrefix(p)
+	}
+	for _, p := range pa.IPv6Prefixes {
+		releaseIPPrefix(p)
+	}
+	for _, p := range pa.IncludeIPv4 {
+		releaseIPPrefix(p)
+	}
+	for _, p := range pa.IncludeIPv6 {
+		releaseIPPrefix(p)
+	}
+	for _, p := range pa.ExcludeIPv4 {
+		releaseIPPrefix(p)
+	}
+	for _, p := range pa.ExcludeIPv6 {
+		releaseIPPrefix(p)
+	}
 
 	pa.IPv4Prefixes = pa.IPv4Prefixes[:0]
 	pa.IPv6Prefixes = pa.IPv6Prefixes[:0]
