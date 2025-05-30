@@ -188,7 +188,12 @@ func (pa *PrefixAggregator) AddFromFile(path string) error {
 		}
 		return fmt.Errorf("failed to open file %s: %w", path, err)
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
 
 	return pa.AddFromReader(file)
 }
@@ -403,7 +408,12 @@ func (pa *PrefixAggregator) WriteToFile(path string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create file %s: %w", path, err)
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
 
 	return pa.WriteToWriter(file)
 }
