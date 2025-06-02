@@ -1,5 +1,6 @@
 package netjugo
 
+
 import (
 	"fmt"
 	"net/netip"
