@@ -119,8 +119,12 @@ func (pa *PrefixAggregator) aggregatePrefixes(prefixes *[]*IPPrefix) error {
 	}
 
 	changed := true
-	for changed {
+	iterations := 0
+	maxIterations := 5000 // Safety limit to prevent infinite loops
+
+	for changed && iterations < maxIterations {
 		changed = false
+		iterations++
 
 		newPrefixes := make([]*IPPrefix, 0, len(*prefixes))
 		i := 0
@@ -170,6 +174,10 @@ func (pa *PrefixAggregator) aggregatePrefixes(prefixes *[]*IPPrefix) error {
 		}
 
 		*prefixes = newPrefixes
+	}
+
+	if iterations >= maxIterations {
+		return fmt.Errorf("aggregation did not converge after %d iterations - possible infinite loop detected", maxIterations)
 	}
 
 	return nil

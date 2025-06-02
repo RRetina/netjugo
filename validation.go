@@ -38,15 +38,15 @@ func parseIPPrefix(prefixStr string) (*IPPrefix, error) {
 		return nil, fmt.Errorf("%w: invalid prefix %q", ErrInvalidPrefix, prefixStr)
 	}
 
-	min, max, err := prefixToUint256Range(prefix)
+	minAddr, maxAddr, err := prefixToUint256Range(prefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert prefix to uint256 range: %w", err)
 	}
 
 	ipPrefix := acquireIPPrefix()
 	ipPrefix.Prefix = prefix
-	ipPrefix.Min.Set(min)
-	ipPrefix.Max.Set(max)
+	ipPrefix.Min.Set(minAddr)
+	ipPrefix.Max.Set(maxAddr)
 
 	return ipPrefix, nil
 }
@@ -114,9 +114,18 @@ func ipv6PrefixToUint256Range(addr netip.Addr, bits int) (*uint256.Int, *uint256
 
 		if hostBits > 64 {
 			shift := hostBits - 64
-			highOnes := new(uint256.Int).SetUint64((1 << shift) - 1)
-			highOnes.Lsh(highOnes, 64)
-			maxAddr.Or(maxAddr, highOnes)
+			if shift >= 64 {
+				// When shift >= 64, we need all remaining bits to be 1
+				// This only happens for /0 prefix (hostBits = 128, shift = 64)
+				highOnes := new(uint256.Int).SetUint64(0xFFFFFFFFFFFFFFFF)
+				highOnes.Lsh(highOnes, 64)
+				maxAddr.Or(maxAddr, highOnes)
+			} else {
+				// Original logic for shift < 64
+				highOnes := new(uint256.Int).SetUint64((1 << shift) - 1)
+				highOnes.Lsh(highOnes, 64)
+				maxAddr.Or(maxAddr, highOnes)
+			}
 		}
 	} else {
 		ones := new(uint256.Int).SetUint64((1 << hostBits) - 1)
