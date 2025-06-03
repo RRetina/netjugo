@@ -25,20 +25,6 @@ var ipPrefixPool = sync.Pool{
 	},
 }
 
-// acquireIPPrefix gets an IPPrefix from the pool
-func acquireIPPrefix() *IPPrefix {
-	return ipPrefixPool.Get().(*IPPrefix)
-}
-
-// releaseIPPrefix returns an IPPrefix to the pool
-func releaseIPPrefix(p *IPPrefix) {
-	// Clear the prefix before returning to pool
-	p.Prefix = netip.Prefix{}
-	p.Min.Clear()
-	p.Max.Clear()
-	ipPrefixPool.Put(p)
-}
-
 type IPPrefix struct {
 	Prefix netip.Prefix
 	Min    *uint256.Int
@@ -77,6 +63,20 @@ type MemoryStats struct {
 	SysBytes        int64
 	NumGC           int64
 	AggregatorBytes int64
+}
+
+// acquireIPPrefix gets an IPPrefix from the pool
+func acquireIPPrefix() *IPPrefix {
+	return ipPrefixPool.Get().(*IPPrefix)
+}
+
+// releaseIPPrefix returns an IPPrefix to the pool
+func releaseIPPrefix(p *IPPrefix) {
+	// Clear the prefix before returning to pool
+	p.Prefix = netip.Prefix{}
+	p.Min.Clear()
+	p.Max.Clear()
+	ipPrefixPool.Put(p)
 }
 
 func NewPrefixAggregator() *PrefixAggregator {
