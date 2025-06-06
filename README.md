@@ -8,15 +8,15 @@ NetJugo is a high-performance Go library for aggregating IPv4 and IPv6 prefixes 
 
 ## Features
 
-- 🚀 **High Performance**: Process millions of prefixes in seconds
-- 🔒 **Thread-Safe**: All operations are safe for concurrent use
-- 📊 **Dual Stack**: Full support for both IPv4 and IPv6
-- ⚡ **Memory Efficient**: Uses object pooling and optimized data structures
-- 🎯 **Flexible Filtering**: Include/exclude specific prefixes
-- 📏 **Minimum Prefix Length**: Enforce minimum aggregation boundaries
-- 📈 **Statistics**: Detailed performance and memory metrics
-- 🔍 **Binary Search**: Fast exclusion processing with O(log n) lookups
-- 🌐 **Bare IP Support**: Automatically converts bare IPs to /32 (IPv4) or /128 (IPv6)
+- **High Performance**: Process millions of prefixes in seconds
+- **Thread-Safe**: All operations are safe for concurrent use
+- **Dual Stack**: Full support for both IPv4 and IPv6
+- **Memory Efficient**: Uses object pooling and optimized data structures
+- **Flexible Filtering**: Include/exclude specific prefixes
+- **Minimum Prefix Length**: Enforce minimum aggregation boundaries
+- **Statistics**: Detailed performance and memory metrics
+- **Binary Search**: Fast exclusion processing with O(log n) lookups
+- **Bare IP Support**: Automatically converts bare IPs to /32 (IPv4) or /128 (IPv6)
 
 ## Installation
 
