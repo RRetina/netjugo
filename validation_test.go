@@ -351,7 +351,6 @@ func TestBareIPAddressExclusion(t *testing.T) {
 }
 
 func TestMinPrefixLengthEnforcement(t *testing.T) {
-	// Test the exact example from CLAUDE.md
 	agg := NewPrefixAggregator()
 	if err := agg.SetMinPrefixLength(21, 0); err != nil {
 		t.Fatalf("Failed to set minimum prefix length: %v", err)
