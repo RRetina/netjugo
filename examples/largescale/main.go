@@ -64,7 +64,7 @@ func main() {
 
 	// Create a new aggregator for the subset
 	subsetAggregator := netjugo.NewPrefixAggregator()
-	subsetPath := ".claude/sample-100k-prefixes.txt"
+	subsetPath := ".testdata/large_dataset.txt"
 
 	if err := subsetAggregator.AddFromFile(subsetPath); err != nil {
 		log.Printf("Sample file not found, proceeding with full dataset aggregation...")
