@@ -15,20 +15,15 @@ const (
 	MinExclusionLenIPv4 = 32  // Allow /32 for IPv4 (single IPs)
 	MinExclusionLenIPv6 = 128 // Allow /128 for IPv6 (single IPs)
 
-	// Recommended minimum exclusion prefix lengths for optimal aggregation
+	// RecommendedMinExclusionIPv4 and RecommendedMinExclusionIPv6 prefix lengths for optimal aggregation
 	RecommendedMinExclusionIPv4 = 30 // /30 for IPv4
 	RecommendedMinExclusionIPv6 = 64 // /64 for IPv6
 )
 
 func (pa *PrefixAggregator) processInclusions() error {
 	// Add include prefixes to main prefix lists
-	for _, includePrefix := range pa.IncludeIPv4 {
-		pa.IPv4Prefixes = append(pa.IPv4Prefixes, includePrefix)
-	}
-
-	for _, includePrefix := range pa.IncludeIPv6 {
-		pa.IPv6Prefixes = append(pa.IPv6Prefixes, includePrefix)
-	}
+	pa.IPv4Prefixes = append(pa.IPv4Prefixes, pa.IncludeIPv4...)
+	pa.IPv6Prefixes = append(pa.IPv6Prefixes, pa.IncludeIPv6...)
 
 	return nil
 }
@@ -189,17 +184,17 @@ func (pa *PrefixAggregator) createComplement(container, exclude *IPPrefix, isIPv
 
 // createOptimalPrefixes creates the minimal set of CIDR prefixes that
 // cover the range from min to max (inclusive)
-func (pa *PrefixAggregator) createOptimalPrefixes(min, max *uint256.Int, isIPv4 bool) ([]*IPPrefix, error) {
+func (pa *PrefixAggregator) createOptimalPrefixes(minVal, maxVal *uint256.Int, isIPv4 bool) ([]*IPPrefix, error) {
 	var result []*IPPrefix
 
 	// Current position in the range
-	current := new(uint256.Int).Set(min)
+	current := new(uint256.Int).Set(minVal)
 
-	for current.Cmp(max) <= 0 {
+	for current.Cmp(maxVal) <= 0 {
 		// Find the largest prefix that:
 		// 1. Starts at 'current'
 		// 2. Doesn't exceed 'max'
-		prefix, prefixMax, err := pa.findLargestValidPrefix(current, max, isIPv4)
+		prefix, prefixMax, err := pa.findLargestValidPrefix(current, maxVal, isIPv4)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find valid prefix: %w", err)
 		}
@@ -210,7 +205,7 @@ func (pa *PrefixAggregator) createOptimalPrefixes(min, max *uint256.Int, isIPv4 
 		current.Add(prefixMax, uint256.NewInt(1))
 
 		// Prevent infinite loop
-		if prefixMax.Cmp(max) >= 0 {
+		if prefixMax.Cmp(maxVal) >= 0 {
 			break
 		}
 	}

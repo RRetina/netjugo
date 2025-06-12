@@ -454,7 +454,7 @@ func TestWarningHandlerConcurrency(t *testing.T) {
 
 	// Set up concurrent-safe warning counter
 	warningCount := 0
-	pa.SetWarningHandler(func(msg string) {
+	pa.SetWarningHandler(func(_ string) {
 		warningCount++
 	})
 

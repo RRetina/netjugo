@@ -196,11 +196,7 @@ func areAdjacent(a, b *IPPrefix) bool {
 	}
 
 	bMaxPlusOne := new(uint256.Int).Add(b.Max, one)
-	if bMaxPlusOne.Cmp(a.Min) == 0 {
-		return true
-	}
-
-	return false
+	return bMaxPlusOne.Cmp(a.Min) == 0
 }
 
 func overlaps(a, b *IPPrefix) bool {
@@ -271,8 +267,8 @@ func mergeOverlapping(a, b *IPPrefix) (*IPPrefix, error) {
 	return nil, fmt.Errorf("cannot merge ranges into valid CIDR prefix")
 }
 
-func canMergeToValidPrefix(min, max *uint256.Int, isIPv4 bool) bool {
-	_, err := uint256RangeToPrefix(min, max, isIPv4)
+func canMergeToValidPrefix(minVal, maxVal *uint256.Int, isIPv4 bool) bool {
+	_, err := uint256RangeToPrefix(minVal, maxVal, isIPv4)
 	return err == nil
 }
 

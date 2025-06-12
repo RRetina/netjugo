@@ -210,7 +210,7 @@ func TestExclusionEdgeCases(t *testing.T) {
 }
 
 // Test concurrent operations
-func TestConcurrentOperations(t *testing.T) {
+func TestConcurrentOperations(_ *testing.T) {
 	pa := NewPrefixAggregator()
 
 	// Add some initial data

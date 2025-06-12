@@ -176,37 +176,37 @@ func isValidIPPrefix(prefixStr string) bool {
 	return err == nil
 }
 
-func uint256RangeToPrefix(min, max *uint256.Int, isIPv4 bool) (netip.Prefix, error) {
+func uint256RangeToPrefix(minVal, maxVal *uint256.Int, isIPv4 bool) (netip.Prefix, error) {
 	if isIPv4 {
-		return uint256RangeToIPv4Prefix(min, max)
+		return uint256RangeToIPv4Prefix(minVal, maxVal)
 	}
-	return uint256RangeToIPv6Prefix(min, max)
+	return uint256RangeToIPv6Prefix(minVal, maxVal)
 }
 
-func uint256RangeToIPv4Prefix(min, max *uint256.Int) (netip.Prefix, error) {
-	if min.Cmp(max) > 0 {
+func uint256RangeToIPv4Prefix(minVal, maxVal *uint256.Int) (netip.Prefix, error) {
+	if minVal.Cmp(maxVal) > 0 {
 		return netip.Prefix{}, fmt.Errorf("%w: min > max in range", ErrInvalidPrefix)
 	}
 
-	minVal := min.Uint64()
-	maxVal := max.Uint64()
+	minV := minVal.Uint64()
+	maxV := maxVal.Uint64()
 
-	if minVal > 0xFFFFFFFF || maxVal > 0xFFFFFFFF {
+	if minV > 0xFFFFFFFF || maxV > 0xFFFFFFFF {
 		return netip.Prefix{}, fmt.Errorf("%w: IPv4 address out of range", ErrInvalidPrefix)
 	}
 
-	if minVal == maxVal {
+	if minV == maxV {
 		minBytes := [4]byte{
-			byte(minVal >> 24),
-			byte(minVal >> 16),
-			byte(minVal >> 8),
-			byte(minVal),
+			byte(minV >> 24),
+			byte(minV >> 16),
+			byte(minV >> 8),
+			byte(minV),
 		}
 		addr := netip.AddrFrom4(minBytes)
 		return netip.PrefixFrom(addr, 32), nil
 	}
 
-	rangeSize := maxVal - minVal + 1
+	rangeSize := maxV - minV + 1
 
 	if (rangeSize & (rangeSize - 1)) != 0 {
 		return netip.Prefix{}, fmt.Errorf("%w: range is not a power of 2", ErrInvalidPrefix)
@@ -218,7 +218,7 @@ func uint256RangeToIPv4Prefix(min, max *uint256.Int) (netip.Prefix, error) {
 		prefixBits--
 	}
 
-	networkAddr := minVal
+	networkAddr := minV
 	mask := uint32(0xFFFFFFFF) << (32 - prefixBits)
 	if (networkAddr & uint64(^mask)) != 0 {
 		return netip.Prefix{}, fmt.Errorf("%w: range not aligned to prefix boundary", ErrInvalidPrefix)
@@ -235,14 +235,14 @@ func uint256RangeToIPv4Prefix(min, max *uint256.Int) (netip.Prefix, error) {
 	return netip.PrefixFrom(addr, prefixBits), nil
 }
 
-func uint256RangeToIPv6Prefix(min, max *uint256.Int) (netip.Prefix, error) {
-	if min.Cmp(max) > 0 {
+func uint256RangeToIPv6Prefix(minVal, maxVal *uint256.Int) (netip.Prefix, error) {
+	if minVal.Cmp(maxVal) > 0 {
 		return netip.Prefix{}, fmt.Errorf("%w: min > max in range", ErrInvalidPrefix)
 	}
 
-	if min.Cmp(max) == 0 {
+	if minVal.Cmp(maxVal) == 0 {
 		minBytes := make([]byte, 32)
-		min.WriteToSlice(minBytes)
+		minVal.WriteToSlice(minBytes)
 
 		var addr16 [16]byte
 		copy(addr16[:], minBytes[len(minBytes)-16:])
@@ -250,7 +250,7 @@ func uint256RangeToIPv6Prefix(min, max *uint256.Int) (netip.Prefix, error) {
 		return netip.PrefixFrom(addr, 128), nil
 	}
 
-	diff := new(uint256.Int).Sub(max, min)
+	diff := new(uint256.Int).Sub(maxVal, minVal)
 	diff.Add(diff, uint256.NewInt(1))
 
 	if !isPowerOfTwo(diff) {
@@ -268,14 +268,14 @@ func uint256RangeToIPv6Prefix(min, max *uint256.Int) (netip.Prefix, error) {
 	if hostBits > 0 {
 		mask := new(uint256.Int).Lsh(uint256.NewInt(1), uint(hostBits))
 		mask.Sub(mask, uint256.NewInt(1))
-		remainder := new(uint256.Int).And(min, mask)
+		remainder := new(uint256.Int).And(minVal, mask)
 		if !remainder.IsZero() {
 			return netip.Prefix{}, fmt.Errorf("%w: range not aligned to prefix boundary", ErrInvalidPrefix)
 		}
 	}
 
 	minBytes := make([]byte, 32)
-	min.WriteToSlice(minBytes)
+	minVal.WriteToSlice(minBytes)
 
 	var addr16 [16]byte
 	copy(addr16[:], minBytes[len(minBytes)-16:])
